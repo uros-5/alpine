@@ -30,6 +30,7 @@ export function start() {
     Array.from(document.querySelectorAll(allSelectors()))
         .filter(outNestedComponents)
         .forEach(el => {
+            destroyTree(el)
             initTree(el)
         })
 

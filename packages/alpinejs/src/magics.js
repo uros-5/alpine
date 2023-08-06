@@ -24,12 +24,19 @@ export function injectMagics(obj, el) {
                 return memoizedUtilities;
             }
         }
+        const property = `$${name}`;
+        let configurable = property == '$el' || property == '$root' ? true : false;
         
+        if (obj.hasOwnProperty(property)) { 
+            if(configurable) {}
+            else {return }
+        }
         Object.defineProperty(obj, `$${name}`, {
             get() {
                 return callback(el, getUtilities());
             },
             enumerable: false,
+            configurable
         })
     })
 
