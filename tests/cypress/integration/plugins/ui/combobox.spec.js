@@ -1,4 +1,4 @@
-import { beVisible, beHidden, haveAttribute, haveClasses, notHaveClasses, haveText, contain, notContain, html, notBeVisible, notHaveAttribute, notExist, haveFocus, test, haveValue, haveLength} from '../../../utils'
+import { beVisible, beHidden, haveAttribute, haveClasses, notHaveClasses, haveText, contain, notContain, html, notBeVisible, notHaveAttribute, notExist, haveFocus, test, haveValue, haveLength, ensureNoConsoleWarns} from '../../../utils'
 
 test('it works with x-model',
     [html`
@@ -66,6 +66,8 @@ test('it works with x-model',
 
                 <article x-text="selected?.name"></article>
             </div>
+
+            <a href="#" x-on:click.prevent="selected = { id: 7, name: 'Caroline Schultz' }">Set selected via code</a>
         </div>
     `],
     ({ get }) => {
@@ -95,6 +97,71 @@ test('it works with x-model',
         get('ul').should(notBeVisible())
         get('input').should(haveValue('Wade Cooper'))
         get('article').should(haveText('Wade Cooper'))
+        get('a').click()
+        get('input').should(haveValue('Caroline Schultz'))
+        get('article').should(haveText('Caroline Schultz'))
+    },
+)
+
+test('initial value is set from x-model',
+    [html`
+        <div
+            x-data="{
+                query: '',
+                selected: { id: 1, name: 'Wade Cooper' },
+                people: [
+                    { id: 1, name: 'Wade Cooper' },
+                ],
+                get filteredPeople() {
+                    return this.query === ''
+                        ? this.people
+                        : this.people.filter((person) => {
+                            return person.name.toLowerCase().includes(this.query.toLowerCase())
+                        })
+                },
+            }"
+        >
+            <div x-combobox x-model="selected">
+                <label x-combobox:label>Select person</label>
+
+                <div>
+                    <div>
+                        <input
+                            x-combobox:input
+                            :display-value="person => person.name"
+                            @change="query = $event.target.value"
+                            placeholder="Search..."
+                        />
+
+                        <button x-combobox:button>Toggle</button>
+                    </div>
+
+                    <div x-combobox:options>
+                        <ul>
+                            <template
+                                x-for="person in filteredPeople"
+                                :key="person.id"
+                                hidden
+                            >
+                                <li
+                                    x-combobox:option
+                                    :option="person.id"
+                                    :value="person"
+                                    :disabled="person.disabled"
+                                    x-text="person.name"
+                                >
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
+
+                <article x-text="selected?.name"></article>
+            </div>
+        </div>
+    `],
+    ({ get }) => {
+        get('input').should(haveValue('Wade Cooper'))
     },
 )
 
@@ -271,7 +338,7 @@ test('"name" prop',
     },
 );
 
-test('Preserves currenty active keyboard selection while options change from searching even if there\'s a selected option in the filtered results',
+test('Preserves currently active keyboard selection while options change from searching even if there\'s a selected option in the filtered results',
     [html`
         <div
             x-data="{
@@ -581,7 +648,7 @@ test('"multiple" prop',
         >
             <label x-combobox:label>Assigned to</label>
 
-            <input x-combobox:input :display-value="(person) => person.name" type="text">
+            <input x-combobox:input type="text">
             <button x-combobox:button x-text="$combobox.value ? $combobox.value.join(',') : 'Select People'"></button>
 
             <ul x-combobox:options>
@@ -707,6 +774,155 @@ test('"multiple" and "name" props together',
         get('ul').should(beVisible())
     },
 );
+
+test('"by" prop with string value',
+    [html`
+        <div
+            x-data="{
+                people: [
+                    { id: 1, name: 'Wade Cooper' },
+                    { id: 2, name: 'Arlene Mccoy' },
+                    { id: 3, name: 'Devon Webb' },
+                    { id: 4, name: 'Tom Cook' },
+                    { id: 5, name: 'Tanya Fox', disabled: true },
+                    { id: 6, name: 'Hellen Schmidt' },
+                    { id: 7, name: 'Caroline Schultz' },
+                    { id: 8, name: 'Mason Heaney' },
+                    { id: 9, name: 'Claudie Smitham' },
+                    { id: 10, name: 'Emil Schaefer' },
+                ]
+            }"
+            x-combobox
+            by="id"
+        >
+            <label x-combobox:label>Assigned to</label>
+
+            <input x-combobox:input :display-value="(person) => person" type="text">
+            <button x-combobox:button x-text="$combobox.value ? $combobox.value : 'Select People'"></button>
+
+            <ul x-combobox:options>
+                <template x-for="person in people" :key="person.id">
+                    <li
+                        :option="person.id"
+                        x-combobox:option
+                        :value="person.id"
+                        :disabled="person.disabled"
+                        :class="{
+                            'selected': $comboboxOption.isSelected,
+                            'active': $comboboxOption.isActive,
+                        }"
+                    >
+                        <span x-text="person.name"></span>
+                    </li>
+                </template>
+            </ul>
+        </div>
+    `],
+    ({ get }) => {
+        get('ul').should(notBeVisible())
+        get('button').click()
+        get('ul').should(beVisible())
+        get('button').click()
+        get('ul').should(notBeVisible())
+        get('button').click()
+        get('[option="2"]').click()
+        get('ul').should(notBeVisible())
+        get('input').should(haveValue('2'))
+        get('button').should(haveText('2'))
+        get('button').click()
+        get('ul').should(contain('Wade Cooper'))
+            .should(contain('Arlene Mccoy'))
+            .should(contain('Devon Webb'))
+        get('[option="3"]').click()
+        get('ul').should(notBeVisible())
+        get('input').should(haveValue('3'))
+        get('button').should(haveText('3'))
+        get('button').click()
+        get('ul').should(contain('Wade Cooper'))
+            .should(contain('Arlene Mccoy'))
+            .should(contain('Devon Webb'))
+        get('[option="1"]').click()
+        get('ul').should(notBeVisible())
+        get('input').should(haveValue('1'))
+        get('button').should(haveText('1'))
+    },
+);
+
+test('"by" prop with string value and "nullable"',
+    [html`
+        <div
+            x-data="{
+                people: [
+                    { id: 1, name: 'Wade Cooper' },
+                    { id: 2, name: 'Arlene Mccoy' },
+                    { id: 3, name: 'Devon Webb' },
+                    { id: 4, name: 'Tom Cook' },
+                    { id: 5, name: 'Tanya Fox', disabled: true },
+                    { id: 6, name: 'Hellen Schmidt' },
+                    { id: 7, name: 'Caroline Schultz' },
+                    { id: 8, name: 'Mason Heaney' },
+                    { id: 9, name: 'Claudie Smitham' },
+                    { id: 10, name: 'Emil Schaefer' },
+                ]
+            }"
+            x-combobox
+            by="id"
+            default-value="5"
+            nullable
+        >
+            <label x-combobox:label>Assigned to</label>
+
+            <input x-combobox:input :display-value="(person) => person?.name" type="text">
+            <button x-combobox:button x-text="$combobox.value ? $combobox.value.name : 'Select People'"></button>
+
+            <ul x-combobox:options>
+                <template x-for="person in people" :key="person.id">
+                    <li
+                        :option="person.id"
+                        x-combobox:option
+                        :value="person"
+                        :disabled="person.disabled"
+                        :class="{
+                            'selected': $comboboxOption.isSelected,
+                            'active': $comboboxOption.isActive,
+                        }"
+                    >
+                        <span x-text="person.name"></span>
+                    </li>
+                </template>
+            </ul>
+        </div>
+    `],
+    ({ get }) => {
+        get('ul').should(notBeVisible())
+        get('button').click()
+        get('ul').should(beVisible())
+        get('button').click()
+        get('ul').should(notBeVisible())
+        get('button').click()
+        get('[option="2"]').click()
+        get('ul').should(notBeVisible())
+        get('input').should(haveValue('Arlene Mccoy'))
+        get('button').should(haveText('Arlene Mccoy'))
+        get('button').click()
+        get('ul').should(contain('Wade Cooper'))
+            .should(contain('Arlene Mccoy'))
+            .should(contain('Devon Webb'))
+        get('[option="3"]').click()
+        get('ul').should(notBeVisible())
+        get('input').should(haveValue('Devon Webb'))
+        get('button').should(haveText('Devon Webb'))
+        get('button').click()
+        get('ul').should(contain('Wade Cooper'))
+            .should(contain('Arlene Mccoy'))
+            .should(contain('Devon Webb'))
+        get('[option="1"]').click()
+        get('ul').should(notBeVisible())
+        get('input').should(haveValue('Wade Cooper'))
+        get('button').should(haveText('Wade Cooper'))
+    },
+);
+
 
 test('keyboard controls',
     [html`
@@ -913,13 +1129,13 @@ test('has accessibility attributes',
             .should(haveAttribute('role', 'option'))
             .should(haveAttribute('id', 'alpine-combobox-option-1'))
             .should(haveAttribute('tabindex', '-1'))
-            .should(haveAttribute('aria-selected', 'true'))
+            .should(haveAttribute('aria-selected', 'false'))
 
         get('[option="2"]')
             .should(haveAttribute('role', 'option'))
             .should(haveAttribute('id', 'alpine-combobox-option-2'))
             .should(haveAttribute('tabindex', '-1'))
-            .should(notHaveAttribute('aria-selected'))
+            .should(haveAttribute('aria-selected', 'false'))
 
         get('input')
             .should(haveAttribute('role', 'combobox'))
@@ -931,9 +1147,13 @@ test('has accessibility attributes',
             .should(haveAttribute('aria-activedescendant', 'alpine-combobox-option-1'))
             .type('{downarrow}')
             .should(haveAttribute('aria-activedescendant', 'alpine-combobox-option-2'))
+            .type('{enter}')
 
         get('[option="2"]')
             .should(haveAttribute('aria-selected', 'true'))
+
+        get('[option="1"]')
+            .should(haveAttribute('aria-selected', 'false'))
     },
 )
 
@@ -1056,6 +1276,7 @@ test('input reset',
             </div>
 
             <article>lorem ipsum</article>
+            <a x-on:click="selected = null">Clear</a>
         </div>
     `],
     ({ get }) => {
@@ -1112,6 +1333,10 @@ test('input reset',
         get('input').type('w')
         get('article').click()
         get('input').should(haveValue('Arlene Mccoy'))
+
+        // Test correct state after clearing selected via code
+        get('a').click()
+        get('input').should(haveValue(''))
     },
 )
 
@@ -1271,6 +1496,7 @@ test('active element logic when opening a combobox',
                                     :option="person.id"
                                     :value="person"
                                     :disabled="person.disabled"
+                                    :class="$comboboxOption.isActive ? 'active' : ''"
                                     x-text="person.name"
                                 >
                                 </li>
@@ -1287,19 +1513,156 @@ test('active element logic when opening a combobox',
         get('button').click()
         // First option is selected on opening if no preselection
         get('ul').should(beVisible())
-        get('[option="1"]').should(haveAttribute('aria-selected', 'true'))
+        get('[option="1"]').should(haveAttribute('aria-selected', 'false'))
+        get('[option="1"]').should(haveClasses(['active']))
         // First match is selected while typing
-        get('[option="4"]').should(notHaveAttribute('aria-selected'))
+        get('[option="4"]').should(haveAttribute('aria-selected', 'false'))
+        get('[option="4"]').should(notHaveClasses(['active']))
         get('input').type('T')
         get('input').trigger('change')
-        get('[option="4"]').should(haveAttribute('aria-selected', 'true'))
+        get('[option="4"]').should(haveAttribute('aria-selected', 'false'))
+        get('[option="4"]').should(haveClasses(['active']))
         // Reset state and select option 3
         get('button').click()
         get('button').click()
         get('[option="3"]').click()
         // Previous selection is selected
         get('button').click()
-        get('[option="4"]').should(notHaveAttribute('aria-selected'))
+        get('[option="4"]').should(haveAttribute('aria-selected', 'false'))
         get('[option="3"]').should(haveAttribute('aria-selected', 'true'))
     }
+)
+
+test('can remove an option without other options getting removed',
+    [html`<div
+        x-data="{
+            query: '',
+            selected: [],
+            frameworks: [
+                {
+                    id: 1,
+                    name: 'Laravel',
+                    disabled: false,
+                },
+                {
+                    id: 2,
+                    name: 'Ruby on Rails',
+                    disabled: false,
+                },
+                {
+                    id: 3,
+                    name: 'Django',
+                    disabled: false,
+                },
+            ],
+            get filteredFrameworks() {
+                return this.query === ''
+                    ? this.frameworks
+                    : this.frameworks.filter((framework) => {
+                        return framework.name.toLowerCase().includes(this.query.toLowerCase())
+                    })
+            },
+            remove(framework) {
+                this.selected = this.selected.filter((i) => i !== framework)
+            }
+        }"
+    >
+        <div x-combobox x-model="selected" by="id" multiple>
+            <div x-show="selected.length">
+                <template x-for="selectedFramework in selected" :key="selectedFramework.id">
+                    <button x-on:click.prevent="remove(selectedFramework)" :remove-option="selectedFramework.id">
+                        <span x-text="selectedFramework.name"></span>
+                    </button>
+                </template>
+            </div>
+
+            <div>
+                <div>
+                    <input
+                        x-combobox:input
+                        @change="query = $event.target.value;"
+                        placeholder="Search..."
+                    />
+                    <button x-combobox:button>
+                        Show options
+                    </button>
+                </div>
+
+                <div x-combobox:options x-cloak x-transition.out.opacity>
+                    <ul>
+                        <template
+                            x-for="framework in filteredFrameworks"
+                            :key="framework.id"
+                            hidden
+                        >
+                            <li
+                                x-combobox:option
+                                :option="framework.id"
+                                :value="framework"
+                                :disabled="framework.disabled"
+                            >
+                                <span x-text="framework.name"></span>
+
+                                <span x-show="$comboboxOption.isSelected" :check="framework.id">&check;</span>
+                            </li>
+                        </template>
+                    </ul>
+
+                    <p x-show="filteredFrameworks.length == 0">No frameworks match your query.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    `],
+    ({ get }) => {
+        get('input').type('a').trigger('input')
+        cy.wait(100)
+        get('[option="1"]').click()
+        get('[option="2"]').click()
+        get('[option="3"]').click()
+        get('[remove-option="3"]').click()
+        get('[option="1"]').should(haveAttribute('aria-selected', 'true'))
+        get('[option="2"]').should(haveAttribute('aria-selected', 'true'))
+        get('[option="3"]').should(haveAttribute('aria-selected', 'false'))
+        get('input').type('a').trigger('input')
+        get('[check="1"]').should(beVisible())
+        get('[check="2"]').should(beVisible())
+        get('[check="3"]').should(notBeVisible())
+    },
+);
+
+test('works with morph',
+    [html`
+    <div x-data="{ value: null }">
+        <div x-combobox x-model="value">
+            <button x-combobox:button>Select Framework</button>
+
+            <ul x-combobox:options>
+                <li x-combobox:option value="laravel">Laravel</li>
+            </ul>
+        </div>
+
+        Selected: <span x-text="value"></span>
+    </div>
+    `],
+    ({ get }, reload, window, document) => {
+        let toHtml = html`
+        <div x-data="{ value: null }">
+            <div x-combobox x-model="value">
+                <button x-combobox:button>Select Framework (updated)</button>
+
+                <ul x-combobox:options>
+                    <li x-combobox:option value="laravel">Laravel</li>
+                </ul>
+            </div>
+
+            Selected: <span x-text="value"></span>
+        </div>
+        `
+        ensureNoConsoleWarns()
+
+        get('div').then(([el]) => window.Alpine.morph(el, toHtml))
+
+        get('button').should(haveText('Select Framework (updated)'))
+    },
 )

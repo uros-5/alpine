@@ -1,4 +1,4 @@
-import { haveData, haveText, haveValue, html, test } from '../../utils'
+import { beChecked, haveData, haveText, haveValue, html, notBeChecked, test } from '../../utils'
 
 test('The name of the test',
     html`<h1 x-data x-text="'HEY'"></h1>`,
@@ -79,6 +79,86 @@ test('x-model with number modifier returns: null if empty, original value if cas
     }
 )
 
+test('x-model casts value to boolean initially for radios',
+    html`
+    <div x-data="{ foo: true }">
+        <input id="1" type="radio" value="true" name="foo" x-model.boolean="foo">
+        <input id="2" type="radio" value="false" name="foo" x-model.boolean="foo">
+    </div>
+    `,
+    ({ get }) => {
+        get('div').should(haveData('foo', true))
+        get('#1').should(beChecked())
+        get('#2').should(notBeChecked())
+        get('#2').click()
+        get('div').should(haveData('foo', false))
+        get('#1').should(notBeChecked())
+        get('#2').should(beChecked())
+    }
+)
+
+test('x-model casts value to boolean if boolean modifier is present',
+    html`
+    <div x-data="{ foo: null, bar: null, baz: [] }">
+        <input type="text" x-model.boolean="foo"></input>
+        <input type="checkbox" x-model.boolean="foo"></input>
+        <input type="radio" name="foo" x-model.boolean="foo" value="true"></input>
+        <input type="radio" name="foo" x-model.boolean="foo" value="false"></input>
+        <select x-model.boolean="bar">
+            <option value="true">yes</option>
+            <option value="false">no</option>
+        </select>
+    </div>
+    `,
+    ({ get }) => {
+        get('input[type=text]').type('1')
+        get('div').should(haveData('foo', true))
+        get('input[type=text]').clear().type('0')
+        get('div').should(haveData('foo', false))
+
+        get('input[type=checkbox]').check()
+        get('div').should(haveData('foo', true))
+        get('input[type=checkbox]').uncheck()
+        get('div').should(haveData('foo', false))
+
+        get('input[type=radio][value="true"]').should(notBeChecked())
+        get('input[type=radio][value="false"]').should(beChecked())
+        get('input[type=radio][value="true"]').check()
+        get('div').should(haveData('foo', true))
+        get('input[type=radio][value="false"]').check()
+        get('div').should(haveData('foo', false))
+
+        get('select').select('false')
+        get('div').should(haveData('bar', false))
+        get('select').select('true')
+        get('div').should(haveData('bar', true))
+    }
+)
+
+test('x-model with boolean modifier returns: null if empty, original value if casting fails, numeric value if casting passes',
+    html`
+    <div x-data="{ foo: 0, bar: '' }">
+        <input x-model.boolean="foo"></input>
+    </div>
+    `,
+    ({ get }) => {
+        get('input').clear()
+        get('div').should(haveData('foo', null))
+        get('input').clear().type('bar')
+        get('div').should(haveData('foo', true))
+        get('input').clear().type('1')
+        get('div').should(haveData('foo', true))
+        get('input').clear().type('1').clear()
+        get('div').should(haveData('foo', null))
+        get('input').clear().type('0')
+        get('div').should(haveData('foo', false))
+        get('input').clear().type('bar')
+        get('div').should(haveData('foo', true))
+        get('input').clear().type('0').clear()
+        get('div').should(haveData('foo', null))
+    }
+)
+
 test('x-model trims value if trim modifier is present',
     html`
     <div x-data="{ foo: '' }">
@@ -130,9 +210,9 @@ test('x-model updates value when the form is reset',
     }
 )
 
-test('x-model with fill modifier takes input value on null or empty string',
+test('x-model with fill modifier takes input value on null, empty string or undefined',
     html`
-    <div x-data="{ a: 123, b: 0, c: '', d: null }">
+    <div x-data="{ a: 123, b: 0, c: '', d: null, e: {} }">
       <input x-model.fill="a" value="123456" />
       <span id="a" x-text="a"></span>
       <input x-model.fill="b" value="123456" />
@@ -141,6 +221,8 @@ test('x-model with fill modifier takes input value on null or empty string',
       <span id="c" x-text="c"></span>
       <input x-model.fill="d" value="123456" />
       <span id="d" x-text="d"></span>
+      <input x-model.fill="e.a" value="123456" />
+      <span id="e" x-text="e.a"></span>
     </div>
     `,
     ({ get }) => {
@@ -148,6 +230,7 @@ test('x-model with fill modifier takes input value on null or empty string',
         get('#b').should(haveText('0'))
         get('#c').should(haveText('123456'))
         get('#d').should(haveText('123456'))
+        get('#e').should(haveText('123456'))
     }
 )
 
